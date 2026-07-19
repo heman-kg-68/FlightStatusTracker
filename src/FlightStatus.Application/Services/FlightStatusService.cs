@@ -1,3 +1,4 @@
+using FlightStatus.Application.Interfaces;
 using FlightStatus.Domain.Interfaces;
 using FlightStatus.Domain.Models;
 using FlightStatusEnum = FlightStatus.Domain.Enums.FlightStatus;
@@ -7,7 +8,7 @@ namespace FlightStatus.Application.Services;
 /// <summary>
 /// Queries all registered flight status providers, normalises their responses
 /// </summary>
-public class FlightStatusService
+public class FlightStatusService : IFlightStatusService
 {
     private readonly IEnumerable<IFlightStatusProvider> _providers;
 

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using FlightStatus.Application.Interfaces;
 using FlightStatus.Application.Services;
 using FlightStatus.Domain.Interfaces;
 using FlightStatus.Infrastructure.Providers;
@@ -24,7 +25,7 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddSingleton<IFlightStatusProvider, AeroTrackProvider>();
 builder.Services.AddSingleton<IFlightStatusProvider, QuickFlightProvider>();
-builder.Services.AddSingleton<FlightStatusService>();
+builder.Services.AddSingleton<IFlightStatusService, FlightStatusService>();
 
 var app = builder.Build();
 
@@ -34,7 +35,7 @@ app.UseSwaggerUI();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithOpenApi();
 
-app.MapGet("/flights/status", async (string? flightNumber, string? date, FlightStatusService service, CancellationToken cancellationToken) =>
+app.MapGet("/flights/status", async (string? flightNumber, string? date, IFlightStatusService service, CancellationToken cancellationToken) =>
 {
     if (string.IsNullOrWhiteSpace(flightNumber) || string.IsNullOrWhiteSpace(date))
     {
