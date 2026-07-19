@@ -6,5 +6,5 @@ public interface IFlightStatusProvider
 {
     string Name { get; }
 
-    Task<ProviderFlightStatusData?> GetStatusAsync(string flightNumber, string date, CancellationToken cancellationToken);
+    Task<ProviderFlightStatusData?> GetStatusAsync(string flightNumber, DateOnly date, CancellationToken cancellationToken);
 }

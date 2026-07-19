@@ -75,7 +75,7 @@ public class QuickFlightProvider : IFlightStatusProvider
 
     public string Name => "QuickFlight";
 
-    public Task<ProviderFlightStatusData?> GetStatusAsync(string flightNumber, string date, CancellationToken cancellationToken)
+    public Task<ProviderFlightStatusData?> GetStatusAsync(string flightNumber, DateOnly date, CancellationToken cancellationToken)
     {
         if (!StubData.TryGetValue(flightNumber, out var result))
         {
@@ -85,7 +85,7 @@ public class QuickFlightProvider : IFlightStatusProvider
         return Task.FromResult<ProviderFlightStatusData?>(new ProviderFlightStatusData
         {
             FlightNumber = result.FlightNumber,
-            Date = date,
+            Date = date.ToString("yyyy-MM-dd"),
             Status = result.Status,
             Message = result.Message,
             ScheduledDepartureUtc = result.ScheduledDepartureUtc,

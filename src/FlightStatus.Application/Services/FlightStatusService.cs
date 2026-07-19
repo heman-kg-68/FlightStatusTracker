@@ -19,7 +19,7 @@ public class FlightStatusService : IFlightStatusService
 
     public async Task<FlightStatusResult> GetFlightStatusAsync(
         string flightNumber,
-        string date,
+        DateOnly date,
         CancellationToken cancellationToken)
     {
         var results = await QueryAllProvidersAsync(flightNumber, date, cancellationToken);
@@ -34,7 +34,7 @@ public class FlightStatusService : IFlightStatusService
 
     private async Task<List<FlightStatusResult>> QueryAllProvidersAsync(
         string flightNumber,
-        string date,
+        DateOnly date,
         CancellationToken cancellationToken)
     {
         var tasks = _providers.Select(provider =>
@@ -48,7 +48,7 @@ public class FlightStatusService : IFlightStatusService
     private static async Task<FlightStatusResult?> QuerySingleProviderAsync(
         IFlightStatusProvider provider,
         string flightNumber,
-        string date,
+        DateOnly date,
         CancellationToken cancellationToken)
     {
         try
@@ -146,10 +146,10 @@ public class FlightStatusService : IFlightStatusService
             .First();
     }
 
-    private static FlightStatusResult CreateUnknownResult(string flightNumber, string date) => new()
+    private static FlightStatusResult CreateUnknownResult(string flightNumber, DateOnly date) => new()
     {
         FlightNumber = flightNumber,
-        Date = date,
+        Date = date.ToString("yyyy-MM-dd"),
         Status = FlightStatusEnum.Unknown,
         Message = "No usable flight status was returned by either provider.",
         SourceProvider = null

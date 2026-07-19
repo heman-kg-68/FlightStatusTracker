@@ -100,7 +100,7 @@ private static readonly IReadOnlyDictionary<string, ProviderFlightStatusData> St
 
     public string Name => "AeroTrack";
 
-    public Task<ProviderFlightStatusData?> GetStatusAsync(string flightNumber, string date, CancellationToken cancellationToken)
+    public Task<ProviderFlightStatusData?> GetStatusAsync(string flightNumber, DateOnly date, CancellationToken cancellationToken)
     {
         if (!StubData.TryGetValue(flightNumber, out var result))
         {
@@ -110,7 +110,7 @@ private static readonly IReadOnlyDictionary<string, ProviderFlightStatusData> St
         return Task.FromResult<ProviderFlightStatusData?>(new ProviderFlightStatusData
         {
             FlightNumber = result.FlightNumber,
-            Date = date,
+            Date = date.ToString("yyyy-MM-dd"),
             Status = result.Status,
             Message = result.Message,
             ScheduledDepartureUtc = result.ScheduledDepartureUtc,

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using FlightStatus.Application.Interfaces;
 using FlightStatus.Application.Services;
@@ -41,8 +42,13 @@ app.MapGet("/flights/status", async (string? flightNumber, string? date, IFlight
     {
         return Results.BadRequest(new { error = "flightNumber and date are required" });
     }
+    
+    if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+    {
+        return Results.BadRequest(new { message = "date must be in yyyy-MM-dd format." });
+    }
 
-    var result = await service.GetFlightStatusAsync(flightNumber, date, cancellationToken);
+    var result = await service.GetFlightStatusAsync(flightNumber, parsedDate, cancellationToken);
     return Results.Ok(result);
 })
 .WithName("GetFlightStatus")
