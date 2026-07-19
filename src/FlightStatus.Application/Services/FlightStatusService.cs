@@ -1,9 +1,12 @@
-using FlightStatus.Domain.Enums;
 using FlightStatus.Domain.Interfaces;
 using FlightStatus.Domain.Models;
+using FlightStatusEnum = FlightStatus.Domain.Enums.FlightStatus;
 
 namespace FlightStatus.Application.Services;
 
+/// <summary>
+/// Queries all registered flight status providers, normalises their responses
+/// </summary>
 public class FlightStatusService
 {
     private readonly IEnumerable<IFlightStatusProvider> _providers;
@@ -13,74 +16,107 @@ public class FlightStatusService
         _providers = providers;
     }
 
-    public async Task<FlightStatusResult> GetFlightStatusAsync(string flightNumber, string date, CancellationToken cancellationToken)
+    public async Task<FlightStatusResult> GetFlightStatusAsync(
+        string flightNumber,
+        string date,
+        CancellationToken cancellationToken)
     {
-        var results = new List<FlightStatusResult>();
+        var results = await QueryAllProvidersAsync(flightNumber, date, cancellationToken);
 
-        foreach (var provider in _providers)
-        {
-            var result = await provider.GetStatusAsync(flightNumber, date, cancellationToken);
-            if (result is not null)
-            {
-                results.Add(NormalizeResult(result));
-            }
-        }
+        var merged = results.Count == 0
+            ? CreateUnknownResult(flightNumber, date)
+            : SelectBestResult(results);
 
-        if (results.Count == 0)
-        {
-            return CreateUnknownResult(flightNumber, date);
-        }
-
-        var selected = results.Aggregate((best, current) => ShouldPrefer(current, best) ? current : best);
-        selected.Message = BuildMessage(selected);
-
-        return selected;
+        merged.Message = BuildMessage(merged);
+        return merged;
     }
 
-    private static FlightStatusResult NormalizeResult(FlightStatusResult result)
+    private async Task<List<FlightStatusResult>> QueryAllProvidersAsync(
+        string flightNumber,
+        string date,
+        CancellationToken cancellationToken)
+    {
+        var tasks = _providers.Select(provider =>
+            QuerySingleProviderAsync(provider, flightNumber, date, cancellationToken));
+
+        var results = await Task.WhenAll(tasks);
+
+        return results.Where(r => r is not null).Select(r => r!).ToList();
+    }
+
+    private static async Task<FlightStatusResult?> QuerySingleProviderAsync(
+        IFlightStatusProvider provider,
+        string flightNumber,
+        string date,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var data = await provider.GetStatusAsync(flightNumber, date, cancellationToken);
+            return data is null ? null : NormalizeResult(data, provider.Name);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static FlightStatusResult NormalizeResult(ProviderFlightStatusData data, string providerName)
     {
         var normalized = new FlightStatusResult
         {
-            FlightNumber = result.FlightNumber,
-            Date = result.Date,
-            Status = result.Status,
-            Message = result.Message,
-            ScheduledDepartureUtc = result.ScheduledDepartureUtc,
-            ActualDepartureUtc = result.ActualDepartureUtc,
-            ScheduledArrivalUtc = result.ScheduledArrivalUtc,
-            ActualArrivalUtc = result.ActualArrivalUtc,
-            Terminal = result.Terminal,
-            Gate = result.Gate,
-            DelayReason = result.DelayReason,
-            LastUpdatedUtc = result.LastUpdatedUtc,
-            SourceProvider = result.SourceProvider
+            FlightNumber = data.FlightNumber,
+            Date = data.Date,
+            Status = NormalizeStatus(data.Status),
+            Message = data.Message ?? "",
+            ScheduledDepartureUtc = data.ScheduledDepartureUtc,
+            ActualDepartureUtc = data.ActualDepartureUtc,
+            ScheduledArrivalUtc = data.ScheduledArrivalUtc,
+            ActualArrivalUtc = data.ActualArrivalUtc,
+            Terminal = data.Terminal,
+            Gate = data.Gate,
+            DelayReason = data.DelayReason,
+            LastUpdatedUtc = data.LastUpdatedUtc,
+            SourceProvider = providerName
         };
 
-        if (normalized.Status != FlightStatus.Domain.Enums.FlightStatus.Unknown)
+        if (normalized.Status == FlightStatusEnum.Unknown)
         {
-            return normalized;
+            normalized.Status = InferStatusFromTiming(normalized);
         }
 
-        normalized.Status = InferStatusFromTiming(normalized);
         return normalized;
     }
 
-    private static FlightStatus.Domain.Enums.FlightStatus InferStatusFromTiming(FlightStatusResult result)
+    private static FlightStatusEnum NormalizeStatus(string? status) => status?.Trim().ToUpperInvariant() switch
     {
-        if (TryGetTimingDelta(result.ScheduledDepartureUtc, result.ActualDepartureUtc, out var departureDelta))
+        "ON_TIME" or "SCHEDULED_ON_TIME" => FlightStatusEnum.OnTime,
+        "DELAY" or "LATE" => FlightStatusEnum.Delayed,
+        "CANCELLED" or "CANCELED" => FlightStatusEnum.Cancelled,
+        "DIVERTED" or "DIVERT" => FlightStatusEnum.Diverted,
+        _ => FlightStatusEnum.Unknown
+    };
+
+    /// <summary>
+    /// Fallback for providers that report Unknown but still supplied schedule/actual
+    /// times — derive OnTime/Delayed from the timing delta rather than giving up.
+    /// </summary>
+    private static FlightStatusEnum InferStatusFromTiming(FlightStatusResult result)
+    {
+        if (TryGetTimingDeltaMinutes(result.ScheduledDepartureUtc, result.ActualDepartureUtc, out var departureDelta))
         {
-            return departureDelta <= 15 ? FlightStatus.Domain.Enums.FlightStatus.OnTime : FlightStatus.Domain.Enums.FlightStatus.Delayed;
+            return departureDelta <= 15 ? FlightStatusEnum.OnTime : FlightStatusEnum.Delayed;
         }
 
-        if (TryGetTimingDelta(result.ScheduledArrivalUtc, result.ActualArrivalUtc, out var arrivalDelta))
+        if (TryGetTimingDeltaMinutes(result.ScheduledArrivalUtc, result.ActualArrivalUtc, out var arrivalDelta))
         {
-            return arrivalDelta <= 15 ? FlightStatus.Domain.Enums.FlightStatus.OnTime : FlightStatus.Domain.Enums.FlightStatus.Delayed;
+            return arrivalDelta <= 15 ? FlightStatusEnum.OnTime : FlightStatusEnum.Delayed;
         }
 
-        return FlightStatus.Domain.Enums.FlightStatus.Unknown;
+        return FlightStatusEnum.Unknown;
     }
 
-    private static bool TryGetTimingDelta(DateTimeOffset? scheduledUtc, DateTimeOffset? actualUtc, out int deltaMinutes)
+    private static bool TryGetTimingDeltaMinutes(DateTimeOffset? scheduledUtc, DateTimeOffset? actualUtc, out int deltaMinutes)
     {
         deltaMinutes = 0;
 
@@ -93,40 +129,30 @@ public class FlightStatusService
         return true;
     }
 
-    private static bool ShouldPrefer(FlightStatusResult candidate, FlightStatusResult current)
+    /// <summary>
+    /// Picks the result to return when one or more providers responded.
+    /// Prefers the later lastUpdatedUtc; on a tie, prefers a known status over Unknown.
+    /// </summary>
+    private static FlightStatusResult SelectBestResult(List<FlightStatusResult> results)
     {
-        var candidateTimestamp = candidate.LastUpdatedUtc ?? DateTimeOffset.MinValue;
-        var currentTimestamp = current.LastUpdatedUtc ?? DateTimeOffset.MinValue;
-
-        if (candidateTimestamp != currentTimestamp)
+        if (results.Count == 1)
         {
-            return candidateTimestamp > currentTimestamp;
+            return results[0];
         }
 
-        if (current.Status == FlightStatus.Domain.Enums.FlightStatus.Unknown && candidate.Status != FlightStatus.Domain.Enums.FlightStatus.Unknown)
-        {
-            return true;
-        }
-
-        if (candidate.Status == FlightStatus.Domain.Enums.FlightStatus.Unknown && current.Status != FlightStatus.Domain.Enums.FlightStatus.Unknown)
-        {
-            return false;
-        }
-
-        return false;
+        return results
+            .OrderByDescending(r => r.LastUpdatedUtc ?? DateTimeOffset.MinValue)
+            .First();
     }
 
-    private static FlightStatusResult CreateUnknownResult(string flightNumber, string date)
+    private static FlightStatusResult CreateUnknownResult(string flightNumber, string date) => new()
     {
-        return new FlightStatusResult
-        {
-            FlightNumber = flightNumber,
-            Date = date,
-            Status = FlightStatus.Domain.Enums.FlightStatus.Unknown,
-            Message = "No usable flight status was returned by either provider.",
-            SourceProvider = null
-        };
-    }
+        FlightNumber = flightNumber,
+        Date = date,
+        Status = FlightStatusEnum.Unknown,
+        Message = "No usable flight status was returned by either provider.",
+        SourceProvider = null
+    };
 
     private static string BuildMessage(FlightStatusResult result)
     {
@@ -137,10 +163,10 @@ public class FlightStatusService
 
         return result.Status switch
         {
-            FlightStatus.Domain.Enums.FlightStatus.OnTime => "The flight is on time.",
-            FlightStatus.Domain.Enums.FlightStatus.Delayed => "The flight is delayed.",
-            FlightStatus.Domain.Enums.FlightStatus.Cancelled => "The flight has been cancelled.",
-            FlightStatus.Domain.Enums.FlightStatus.Diverted => "The flight has been diverted.",
+            FlightStatusEnum.OnTime => "The flight is on time.",
+            FlightStatusEnum.Delayed => "The flight is delayed.",
+            FlightStatusEnum.Cancelled => "The flight has been cancelled.",
+            FlightStatusEnum.Diverted => "The flight has been diverted.",
             _ => "No usable flight status was returned by either provider."
         };
     }
