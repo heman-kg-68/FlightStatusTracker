@@ -175,6 +175,19 @@ The implementation follows the challenge requirements and makes these assumption
 - The 15-minute threshold is treated inclusively: within 15 minutes is OnTime, beyond 15 minutes is Delayed.
 - The backend returns a clear message for Unknown outcomes rather than an empty response.
 
+## Status Mapping Assumptions
+
+The following mapping was assumed and locked
+in before implementation.
+
+| Unified Status | AeroTrack                      | QuickFlight                    |
+| -------------- | ------------------------------ | ------------------------------ |
+| OnTime         | `ON_TIME`                      | `SCHEDULED_ON_TIME`            |
+| Delayed        | `DELAY`                        | `Late`                         |
+| Cancelled      | `CANCELLED`                    | `CANCELED`                     |
+| Diverted       | `DIVERTED`                     | `Divert`                       |
+| Unknown        | anything else / missing / null | anything else / missing / null |
+
 ## Design Decisions
 
 - The backend keeps the API layer thin and moves the business logic into the application layer.
