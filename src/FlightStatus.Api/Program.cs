@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using FlightStatus.Application.Interfaces;
 using FlightStatus.Application.Services;
-using FlightStatus.Domain.Interfaces;
 using FlightStatus.Infrastructure.Providers;
 using Microsoft.OpenApi.Models;
 

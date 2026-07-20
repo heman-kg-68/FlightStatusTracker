@@ -1,5 +1,4 @@
 using FlightStatus.Application.Interfaces;
-using FlightStatus.Domain.Interfaces;
 using FlightStatus.Domain.Models;
 using FlightStatusEnum = FlightStatus.Domain.Enums.FlightStatus;
 

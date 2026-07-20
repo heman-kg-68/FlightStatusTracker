@@ -1,6 +1,6 @@
 using FlightStatus.Domain.Models;
 
-namespace FlightStatus.Domain.Interfaces;
+namespace FlightStatus.Application.Interfaces;
 
 public interface IFlightStatusProvider
 {

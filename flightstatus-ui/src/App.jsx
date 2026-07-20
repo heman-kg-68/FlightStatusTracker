@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./styles.css";
 
-const defaultFlightNumber = "SKY-PAIR";
+const defaultFlightNumber = "A100";
 const defaultDate = "2026-07-19";
 
 const statusStyles = {
@@ -72,10 +72,6 @@ function App() {
         <header>
           <p className="eyebrow">SkyRoute Support Console</p>
           <h1>Flight Status Tracker</h1>
-          <p className="subtitle">
-            Look up a flight and view the normalized status from the offline
-            providers.
-          </p>
         </header>
 
         <form onSubmit={handleSubmit} className="search-form">

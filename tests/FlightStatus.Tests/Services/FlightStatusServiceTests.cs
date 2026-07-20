@@ -1,7 +1,6 @@
 using FlightStatus.Application.Interfaces;
 using FlightStatus.Application.Services;
 using FlightStatus.Domain.Enums;
-using FlightStatus.Domain.Interfaces;
 using FlightStatus.Domain.Models;
 using Xunit;
 

@@ -1,4 +1,4 @@
-using FlightStatus.Domain.Interfaces;
+using FlightStatus.Application.Interfaces;
 using FlightStatus.Domain.Models;
 
 namespace FlightStatus.Infrastructure.Providers;
